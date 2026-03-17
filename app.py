@@ -621,10 +621,9 @@ st.markdown("""
 
 
 # --- UTILITY FUNCTIONS ---
-def parse_plan_to_json(text, is_diet=False):
+def parse_plan_to_json(text):
     sections = []
-    pattern = r'(Day \d+:.*)' if not is_diet else r'(Meal \d+:.*|Breakfast:|Lunch:|Dinner:|Snack:)'
-    parts = re.split(pattern, text)
+    parts = re.split(r'(Day \d+:.*)', text)
     if len(parts) > 1:
         for i in range(1, len(parts), 2):
             header = parts[i].strip()
@@ -635,12 +634,122 @@ def parse_plan_to_json(text, is_diet=False):
                     main_part = line.strip('- *').split('|')[0].split(':')[0].strip()
                     items.append({
                         "name": main_part,
-                        "val1": "3 sets" if not is_diet else "1 bowl",
-                        "val2": "10 reps" if not is_diet else "300 kcal",
-                        "val3": "60s" if not is_diet else "Protein"
+                        "val1": "3 sets",
+                        "val2": "10 reps",
+                        "val3": "60s"
                     })
             sections.append({"header": header, "items": items})
     return sections
+
+def parse_diet_plan(text):
+    """Parse dietary plan to extract days and meals with time, calories, and dishes."""
+    days_data = []
+    
+    # Split by Day pattern
+    day_pattern = r'Day (\d+)'
+    day_matches = list(re.finditer(day_pattern, text))
+    
+    if not day_matches:
+        return days_data
+    
+    for idx, day_match in enumerate(day_matches):
+        day_num = int(day_match.group(1))
+        
+        # Get content until next day or end of text
+        content_start = day_match.end()
+        content_end = day_matches[idx + 1].start() if idx + 1 < len(day_matches) else len(text)
+        day_content = text[content_start:content_end].strip()
+        
+        meals = []
+        meal_names = ['Breakfast', 'Lunch', 'Dinner', 'Snack']
+        
+        # Split content by newlines and process each line
+        for line in day_content.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Check if line contains a meal name
+            meal_name = None
+            for name in meal_names:
+                if name.lower() in line.lower():
+                    meal_name = name
+                    break
+            
+            if meal_name:
+                # Remove meal name from the start
+                meal_content = re.sub(rf'^{meal_name}[:\-\s]*', '', line, flags=re.IGNORECASE).strip()
+                
+                # Extract time from parentheses or standalone time pattern
+                time = "--:--"
+                time_match = re.search(r'\(?(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)\)?', meal_content)
+                if not time_match:
+                    time_match = re.search(r'\b(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)\b', meal_content)
+                    
+                if time_match:
+                    time = time_match.group(1).strip()
+                
+                # Extract calories - look for pattern: comma, space, number (with or without kcal)
+                calories = "-- kcal"
+                cal_match = re.search(r',\s*(\d+)\s*(?:kcal|cal|calories)?', meal_content, re.IGNORECASE)
+                if cal_match:
+                    cal_value = cal_match.group(1)
+                    calories = f"{cal_value} kcal"
+                
+                # Extract dish name
+                dish = meal_content
+                
+                # Clean up
+                dish = re.sub(r'\(?(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)\)?', '', dish)
+                dish = re.sub(r'\b(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)\b', '', dish)
+                dish = re.sub(r',\s*\d+\s*(?:kcal|cal|calories)?', '', dish, flags=re.IGNORECASE)
+                dish = re.sub(r'Meal\s+Name\s*:\s*', '', dish, flags=re.IGNORECASE)
+                dish = re.sub(r'[\-\|]', '', dish)
+                dish = ' '.join(dish.split()).strip()
+                dish = dish.rstrip(',-:')
+                
+                if len(dish) > 30:
+                    words = [w for w in dish.split() if len(w) > 1]
+                    dish = ' '.join(words[:3])
+                
+                if dish and dish.lower() not in ['', 'none', 'n/a']:
+                    meals.append({
+                        "meal": meal_name,
+                        "time": time,
+                        "calories": calories,
+                        "dish": dish
+                    })
+        
+        if meals:
+            days_data.append({
+                "day": day_num,
+                "meals": meals
+            })
+    
+    return days_data[:5]
+
+def render_diet_cards(diet_data):
+    """Render dietary plan as cards with Day, Time, Calories, and Dish."""
+    for day_info in diet_data:
+        day_num = day_info["day"]
+        st.markdown(f"""
+        <div class="day-container">
+            <div class="day-header">◆ Day {day_num}</div>
+        """, unsafe_allow_html=True)
+        
+        for meal in day_info["meals"]:
+            st.markdown(f"""
+            <div class="item-row">
+                <div class="ex-name"><span class="ex-bullet"></span>{meal['meal']}</div>
+                <div class="stat-group">
+                    <div class="stat-pill"><span class="stat-val">{meal['time']}</span><span class="stat-label">TIME</span></div>
+                    <div class="stat-pill"><span class="stat-val">{meal['calories']}</span><span class="stat-label">CALORIES</span></div>
+                    <div class="stat-pill" title="{meal['dish']}"><span class="stat-val">{meal['dish']}</span><span class="stat-label">DISH</span></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def parse_diet_plan(text):
