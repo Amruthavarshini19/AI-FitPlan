@@ -1,41 +1,41 @@
 import os
-import requests
+import smtplib
+from email.message import EmailMessage
 import streamlit as st
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Try getting from Streamlit Secrets first, fallback to os.environ (local)
 try:
-    SENDGRID_API_KEY = st.secrets["SENDGRID_API_KEY"]
+    SMTP_PASSWORD = st.secrets.get("SMTP_PASSWORD") or st.secrets["SENDGRID_API_KEY"] # Fallback if they haven't updated secrets yet
     SENDER_EMAIL = st.secrets["SENDER_EMAIL"]
 except Exception:
-    SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD") or os.getenv("SENDGRID_API_KEY") # During transition
     SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 
+if SMTP_PASSWORD:
+    # Google App Passwords often have spaces when copied, remove them
+    SMTP_PASSWORD = SMTP_PASSWORD.replace(" ", "")
+
 def send_otp_email(receiver_email, otp):
-    if not SENDGRID_API_KEY or not SENDER_EMAIL:
-        raise Exception("API Keys are missing from Streamlit Secrets!")
+    if not SMTP_PASSWORD or not SENDER_EMAIL:
+        raise Exception("Google App Password or Sender Email missing from secrets!")
         
-    url = "https://api.sendgrid.com/v3/mail/send"
+    msg = EmailMessage()
+    msg.set_content(f"Hello!\\n\\nYour secure FitPlan AI OTP is: {otp}\\n\\nWelcome to the platform.")
+    msg["Subject"] = "Your FitPlan AI OTP"
+    msg["From"] = f"FitPlan AI <{SENDER_EMAIL}>"
+    msg["To"] = receiver_email
 
-    headers = {
-        "Authorization": f"Bearer {SENDGRID_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    data = {
-        "personalizations": [{
-            "to": [{"email": receiver_email}]
-        }],
-        "from": {"email": SENDER_EMAIL},
-        "subject": "Your FitPlan AI OTP",
-        "content": [{
-            "type": "text/plain",
-            "value": f"Your OTP is: {otp}"
-        }]
-    }
-
-    response = requests.post(url, headers=headers, json=data)
-
-    if response.status_code != 202:
-        raise Exception(f"Failed to send email. Status: {response.status_code}, Msg: {response.text}")
+    try:
+        # Connect to Gmail SMTP server
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()  # Secure the connection
+        server.login(SENDER_EMAIL, SMTP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+    except smtplib.SMTPAuthenticationError:
+        raise Exception("Gmail Authentication Failed. Check your 16-letter App Password!")
+    except Exception as e:
+        raise Exception(f"Failed to send email via Gmail: {str(e)}")
