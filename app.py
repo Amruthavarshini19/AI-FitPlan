@@ -980,6 +980,7 @@ if not st.session_state.authenticated:
                         try:
                             send_otp_email(signup_email, otp)
                             st.success("✓ OTP sent to your email")
+                            st.info(f"*(For testing, since emails are delayed: The OTP is **{otp}**)*")
                         except Exception as e:
                             st.error(f"✗ Email delivery failed: {str(e)}")
                 else:
