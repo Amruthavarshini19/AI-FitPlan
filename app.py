@@ -980,8 +980,8 @@ if not st.session_state.authenticated:
                         try:
                             send_otp_email(signup_email, otp)
                             st.success("✓ OTP sent to your email")
-                        except Exception:
-                            st.error("✗ Email delivery failed")
+                        except Exception as e:
+                            st.error(f"✗ Email delivery failed: {str(e)}")
                 else:
                     st.error("Please fill all fields")
             
