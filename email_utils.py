@@ -7,12 +7,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Try getting from Streamlit Secrets first, fallback to os.environ (local)
-try:
-    SMTP_PASSWORD = st.secrets.get("SMTP_PASSWORD") or st.secrets["SENDGRID_API_KEY"] # Fallback if they haven't updated secrets yet
-    SENDER_EMAIL = st.secrets["SENDER_EMAIL"]
-except Exception:
-    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD") or os.getenv("SENDGRID_API_KEY") # During transition
-    SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+def get_secret(key):
+    try:
+        return st.secrets[key]
+    except Exception:
+        return os.getenv(key)
+
+SMTP_PASSWORD = get_secret("SMTP_PASSWORD") or get_secret("SENDGRID_API_KEY")
+SENDER_EMAIL = get_secret("SENDER_EMAIL")
 
 if SMTP_PASSWORD:
     # Google App Passwords often have spaces when copied, remove them
