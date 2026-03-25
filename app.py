@@ -1,7 +1,7 @@
 import streamlit as st
 import json
 import re
-from prompt_builder import build_prompt 
+from prompt_builder import build_prompt, build_adjustment_prompt 
 from model_api import query_model 
 from diet_builder import build_diet_prompt
 from auth import generate_otp, create_jwt, verify_jwt, hash_password, verify_password
@@ -1081,6 +1081,23 @@ else:
                     </p>
                 </div>
             """, unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("<div class='section-title' style='font-size:24px;'>Daily Intel Check-In</div>", unsafe_allow_html=True)
+            check_in_text = st.text_input("How are you feeling today?", placeholder="E.g. My legs are super sore, or I only slept 4 hours...", label_visibility="collapsed")
+            if st.button("⚡ Sync & Adjust Plan", use_container_width=True):
+                if check_in_text and st.session_state.workout_plan:
+                    with st.spinner("Analyzing biometric feedback and adjusting your plan..."):
+                        adj_prompt = build_adjustment_prompt(st.session_state.workout_plan, check_in_text)
+                        st.session_state.workout_plan = query_model(adj_prompt)
+                        st.session_state.user_data["workout_plan"] = st.session_state.workout_plan
+                        if st.session_state.authenticated and st.session_state.user_email:
+                            update_user_profile(st.session_state.user_email, st.session_state.user_data)
+                        st.success("✓ Plan updated in real-time based on your feedback!")
+                elif not st.session_state.workout_plan:
+                    st.error("Generate a workout plan first to use the AI Coach!")
+                else:
+                    st.error("Please enter your current condition.")
         else:
             st.markdown("""
                 <div style='text-align:center;padding:80px 40px;'>

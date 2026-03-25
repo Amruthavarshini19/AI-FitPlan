@@ -43,3 +43,22 @@ STRICT FORMATTING RULES:
 6. Do not include any intro or outro text. Output only the days and exercises."""
 
     return prompt, bmi, bmi_status, status_color
+
+def build_adjustment_prompt(current_plan, feedback):
+    """Generates a prompt to adjust the workout plan based on daily check-in feedback."""
+    return f"""You are a professional fitness AI coach. 
+The user has provided a daily check-in regarding their body condition and fatigue: "{feedback}"
+
+Here is their current 5-day workout plan:
+{current_plan}
+
+Based ONLY on their check-in feedback, critically adapt their plan to keep them safe but progressing.
+- If they are sore, swap the sore muscle group for active recovery, stretching, or a different muscle group.
+- If they are tired/slept poorly, reduce the volume (sets/reps) or intensity for the upcoming days.
+- If they say it's too easy, increase volume or intensity.
+- KEEP THE EXACT SAME STRICT FORMATTING RULES AS THE ORIGINAL PLAN:
+  1. Label days as Day 1:, Day 2:, etc.
+  2. For EVERY exercise, use this EXACT format:
+     - Exercise Name | Sets | Reps | Rest
+  3. Example: - Dumbbell Bench Press | 3 | 10-12 | 60s
+  4. Do not include any intro or outro text. Output only the days and exercises."""

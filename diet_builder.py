@@ -11,6 +11,8 @@ def build_diet_prompt(name, gender, age, height, weight, goal):
     prompt = f"""
     Act as a professional nutritionist for {name}.
     Stats: Age {age}, Gender {gender}, BMI {bmi:.1f}, Goal: {goal}, Strategy: {diet_type}.
+    
+    CRITICAL: You MUST ONLY generate menus based strictly on authentic Indian cuisine. Do not include any Western or non-Indian dishes.
 
     STRICT FORMAT:
     Day 1: Daily Nutrition Plan
