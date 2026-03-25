@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import json
 import re
 from prompt_builder import build_prompt, build_adjustment_prompt 
@@ -1071,6 +1072,27 @@ else:
                 st.markdown(f'<div class="stat-card"><div class="stat-val-big">✓</div><div class="stat-label-big">{d["goal"]}</div></div>', unsafe_allow_html=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
+            
+            # 🏆 PROGRESS & XP SYSTEM 🏆
+            total_xp = 0
+            history = d.get("workout_history", [])
+            if history:
+                total_xp = sum([entry.get("xp", 100) for entry in history])
+                
+            level = (total_xp // 500) + 1
+            progress_to_next = total_xp % 500
+            progress_percent = progress_to_next / 500.0
+            
+            st.markdown(f"""
+                <div style='background:#FFFFFF; border:1px solid rgba(26,20,16,0.08); border-radius:8px; padding:24px 32px; box-shadow:0 2px 12px rgba(26,20,16,0.05); margin-bottom: 24px;'>
+                    <h3 style='margin:0 0 10px 0; color:#1A1410;'>🏆 Athlete Level {level}</h3>
+                    <p style='color:#6A5A4A; font-family:"DM Mono", monospace; font-size:14px; margin:0 0 15px 0;'>Total Experience: {total_xp} XP</p>
+            """, unsafe_allow_html=True)
+            
+            st.progress(progress_percent)
+            st.markdown(f"<p style='font-size:12px; color:#A09080; text-align:right; margin-top:5px;'>{500 - progress_to_next} XP to Level {level + 1}</p></div>", unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(f"""
                 <div style='background:#FFFFFF;border:1px solid rgba(26,20,16,0.08);border-radius:8px;padding:28px 32px;box-shadow:0 2px 12px rgba(26,20,16,0.05);'>
                     <span class='badge-pulse'>Active Plan</span>
@@ -1173,6 +1195,25 @@ else:
 
         plan_json = parse_plan_to_json(st.session_state.workout_plan)
         if plan_json:
+            # LIVE WORKOUT LAUNCHER
+            st.markdown("""
+                <div style='background:rgba(200,160,100,0.05); padding: 20px; border-radius:8px; border:1px solid rgba(200,160,100,0.2); margin-bottom: 20px;'>
+                    <h3 style='margin-top:0; color:#1A1410;'>⚡ Live Workout Mode</h3>
+                    <p style='color:#6A5A4A; font-size:14px;'>Select a day to enter the immersive tracking environment.</p>
+                </div>
+            """, unsafe_allow_html=True)
+            day_names = [s['header'] for s in plan_json if 'rest' not in s['header'].lower()]
+            if day_names:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    selected_day = st.selectbox("Select Training Day:", day_names, label_visibility="collapsed")
+                with col2:
+                    if st.button("START LIVE →", use_container_width=True):
+                        st.session_state.current_live_workout = next(s for s in plan_json if s['header'] == selected_day)
+                        st.session_state.page = "live_workout"
+                        st.rerun()
+            st.markdown("<hr class='light-divider'>", unsafe_allow_html=True)
+
             render_cards(plan_json, "SETS", "REPS", "REST")
         else:
             st.markdown(f"""
@@ -1181,7 +1222,102 @@ else:
 {st.session_state.workout_plan}
                     </pre>
                 </div>
+                </div>
             """, unsafe_allow_html=True)
+
+    # ══ LIVE WORKOUT TRACKER ══
+    elif st.session_state.page == "live_workout":
+        day_data = st.session_state.current_live_workout
+        st.markdown(f"<div class='section-title'>⚡ {day_data['header']} - Live Server</div>", unsafe_allow_html=True)
+        st.markdown("<div class='tagline' style='margin-bottom:32px;margin-top:12px;'>— crush this session</div>", unsafe_allow_html=True)
+
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            if st.button("← Cancel Stop", use_container_width=True):
+                st.session_state.get("workout_just_finished", False)
+                st.session_state.page = "result"
+                st.rerun()
+
+        st.markdown("<hr class='light-divider'>", unsafe_allow_html=True)
+        
+        # Real-time Rest Timer using custom HTML/JS
+        components.html("""
+        <div style="text-align: center; font-family: 'DM Sans', sans-serif; background: #FFFFFF; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid rgba(26,20,16,0.08);">
+            <div style="font-size: 14px; letter-spacing: 2px; color: #A09080; text-transform: uppercase;">Recovery Timer</div>
+            <div id="timer" style="font-size: 64px; font-weight: 900; color: #1A1410; margin: 10px 0; font-variant-numeric: tabular-nums;">00:00</div>
+            <div>
+                <button onclick="startTimer(30)" style="padding: 12px 24px; background: #f4f4f4; color: #1A1410; border: none; border-radius: 8px; cursor: pointer; margin: 5px; font-weight: bold; transition: all 0.2s;">30s Rest</button>
+                <button onclick="startTimer(60)" style="padding: 12px 24px; background: #C8A064; color: white; border: none; border-radius: 8px; cursor: pointer; margin: 5px; font-weight: bold; box-shadow: 0 2px 8px rgba(200,160,100,0.4);">60s Rest</button>
+                <button onclick="startTimer(90)" style="padding: 12px 24px; background: #1A1410; color: white; border: none; border-radius: 8px; cursor: pointer; margin: 5px; font-weight: bold;">90s Rest</button>
+            </div>
+            <script>
+                let interval;
+                function startTimer(duration) {
+                    clearInterval(interval);
+                    let timer = duration, minutes, seconds;
+                    document.getElementById('timer').style.color = '#1A1410';
+                    interval = setInterval(function () {
+                        minutes = parseInt(timer / 60, 10);
+                        seconds = parseInt(timer % 60, 10);
+                        minutes = minutes < 10 ? "0" + minutes : minutes;
+                        seconds = seconds < 10 ? "0" + seconds : seconds;
+                        document.getElementById('timer').textContent = minutes + ":" + seconds;
+                        if (--timer < 0) {
+                            clearInterval(interval);
+                            document.getElementById('timer').textContent = "GO!";
+                            document.getElementById('timer').style.color = '#2ecc71';
+                        }
+                    }, 1000);
+                }
+            </script>
+        </div>
+        """, height=220)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("### 📋 Exercise Checklist", unsafe_allow_html=True)
+        
+        all_done = True
+        for idx, item in enumerate(day_data['items']):
+            st.markdown(f"""
+            <div style="background: rgba(255,255,255,0.7); padding: 16px 20px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #C8A064; display: flex; align-items: center;">
+                <div style="flex-grow: 1; font-family: 'DM Sans'; font-size: 18px; font-weight: 500; color: #1A1410;">
+                    {item['name']}
+                </div>
+                <div style="font-family: 'DM Mono'; font-size: 14px; color: #6A5A4A; background: #f4f4f4; padding: 4px 12px; border-radius: 20px;">
+                    {item['val1']} · {item['val2']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            done = st.checkbox("Mark Completed", key=f"ex_{idx}")
+            if not done:
+                all_done = False
+
+        st.markdown("<br><hr class='light-divider'>", unsafe_allow_html=True)
+        
+        if st.session_state.get("workout_just_finished"):
+            st.success("🎉 Activity successfully logged to your athlete profile! XP Granted.")
+            if st.button("Return to Command Centre →", use_container_width=True):
+                st.session_state.workout_just_finished = False
+                st.session_state.page = "dashboard"
+                st.rerun()
+        else:
+            if st.button("🏁 Finish Workout & Sync Profile", use_container_width=True):
+                if all_done:
+                    st.balloons()
+                    if "workout_history" not in st.session_state.user_data:
+                        st.session_state.user_data["workout_history"] = []
+                    import datetime
+                    st.session_state.user_data["workout_history"].append({
+                        "date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "day": day_data['header'],
+                        "xp": 100
+                    })
+                    if st.session_state.authenticated and st.session_state.user_email:
+                        update_user_profile(st.session_state.user_email, st.session_state.user_data)
+                    st.session_state.workout_just_finished = True
+                    st.rerun()
+                else:
+                    st.warning("⚠️ Please check off all exercises before finishing!")
 
     # ══ DIET ══
     elif st.session_state.page == "diet":
