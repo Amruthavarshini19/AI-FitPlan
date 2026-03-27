@@ -1145,8 +1145,8 @@ else:
         with st.container():
             c1, c2, c3 = st.columns([2, 1, 1])
             with c1: name = st.text_input("Full Name", value=existing_data.get("name", ""))
-            with c2: gender = st.selectbox("Gender", ["Male", "Female", "Other"], 
-                                         index=["Male", "Female", "Other"].index(existing_data.get("gender", "Male")) if existing_data.get("gender") in ["Male", "Female", "Other"] else 0)
+            with c2: gender = st.selectbox("Gender", ["Male", "Female"], 
+                                         index=["Male", "Female"].index(existing_data.get("gender", "Male")) if existing_data.get("gender") in ["Male", "Female"] else 0)
             with c3: age = st.number_input("Age", min_value=1, value=int(existing_data.get("age", 19)))
 
             h, w = st.columns(2)
